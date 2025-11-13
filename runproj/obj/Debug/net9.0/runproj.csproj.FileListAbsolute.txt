@@ -12,3 +12,4 @@ C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\refint\ru
 C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.pdb
 C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.genruntimeconfig.cache
 C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\ref\runproj.dll
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.sourcelink.json
