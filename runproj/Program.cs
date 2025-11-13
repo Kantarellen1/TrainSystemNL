@@ -12,17 +12,20 @@ namespace TimesaverSolverCSharp
 
         static void Main()
         {
+            // Layout: number of positions per siding (creates nodes A0..A{n-1}, etc.)
             var sidingLengths = new Dictionary<string, int>
             {
-                ["A"] = 2,
-                ["B"] = 3,
-                ["C"] = 1,
-                ["D"] = 2,
-                ["E"] = 1
+                ["A"] = 2, // creates A0,A1
+                ["B"] = 3, // creates B0,B1,B2
+                ["C"] = 1, // creates C0
+                ["D"] = 2, // creates D0,D1
+                ["E"] = 1  // creates E0
             };
 
+            // Build adjacency graph from the siding lengths. Graph keys are node names (e.g. "A0") and special nodes "MAIN","M1","M2".
             var graph = BuildTimesaverLayout(sidingLengths);
 
+            // Initial positions of cars: key = car id, value = node name where it starts
             var startCars = new Dictionary<string, string>
             {
                 ["C1"] = "A0",
@@ -31,12 +34,13 @@ namespace TimesaverSolverCSharp
                 ["C4"] = "E0"
             };
 
+            // Goal positions (each car may accept multiple goal nodes)
             var carGoals = new Dictionary<string, HashSet<string>>
             {
-                ["C1"] = new HashSet<string> { "E0" },
-                ["C2"] = new HashSet<string> { "C0" },
-                ["C3"] = new HashSet<string> { "B2" },
-                ["C4"] = new HashSet<string> { "A1" }
+                ["C1"] = new HashSet<string> { "E0" },  // C1 should end at E0
+                ["C2"] = new HashSet<string> { "C0" },  // C2 -> C0
+                ["C3"] = new HashSet<string> { "B2" },  // C3 -> B2
+                ["C4"] = new HashSet<string> { "A1" }   // C4 -> A1
             };
 
             // quick reachability check (ignores blocking by other cars)
