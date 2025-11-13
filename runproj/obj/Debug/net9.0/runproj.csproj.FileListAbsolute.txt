@@ -1,0 +1,14 @@
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\bin\Debug\net9.0\runproj.exe
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\bin\Debug\net9.0\runproj.deps.json
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\bin\Debug\net9.0\runproj.runtimeconfig.json
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\bin\Debug\net9.0\runproj.dll
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\bin\Debug\net9.0\runproj.pdb
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.AssemblyInfoInputs.cache
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.AssemblyInfo.cs
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.csproj.CoreCompileInputs.cache
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.dll
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\refint\runproj.dll
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.pdb
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\runproj.genruntimeconfig.cache
+C:\Users\Kalle\Documents\GitHub\TrainSystemNL\runproj\obj\Debug\net9.0\ref\runproj.dll
