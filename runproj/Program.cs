@@ -43,6 +43,154 @@ namespace TimesaverSolverCSharp
                 ["C4"] = new HashSet<string> { "A1" }   // C4 -> A1
             };
 
+            // Interactive allowed route selection:
+            // - Press Enter or type "ALL" -> allow entire graph
+            // - Type a single siding letter (A..E) or a single node (e.g. A1) -> treated as destination: print loco-only shortest path and exit
+            // - Provide comma/space-separated node list -> if any token is a destination node or siding, that destination is used (shortest-path) and loco-only moves printed
+            //   otherwise tokens are treated as explicit allowed nodes.
+            Console.WriteLine("Enter allowed route (ALL / single siding letter A..E as destination / single node e.g. A1 / comma/space list). Press Enter for ALL:");
+            var routeRaw = (Console.ReadLine() ?? "").Trim().ToUpper();
+
+            // BFS to find shortest path (returns node list including start and goal)
+            List<string> ShortestPathNodes(string from, string to)
+            {
+                if (!graph.ContainsKey(from) || !graph.ContainsKey(to)) return new List<string>();
+                var q = new Queue<string>();
+                var parent = new Dictionary<string, string?>();
+                q.Enqueue(from);
+                parent[from] = null;
+                while (q.Count > 0)
+                {
+                    var u = q.Dequeue();
+                    if (u == to) break;
+                    foreach (var v in graph[u])
+                    {
+                        if (!parent.ContainsKey(v))
+                        {
+                            parent[v] = u;
+                            q.Enqueue(v);
+                        }
+                    }
+                }
+                if (!parent.ContainsKey(to)) return new List<string>();
+                var path = new List<string>();
+                string? cur = to;
+                while (cur != null)
+                {
+                    path.Add(cur);
+                    cur = parent[cur];
+                }
+                path.Reverse();
+                return path;
+            }
+
+            HashSet<string> allowedRoute;
+
+            if (string.IsNullOrEmpty(routeRaw) || routeRaw == "ALL")
+            {
+                allowedRoute = new HashSet<string>(graph.Keys);
+                Console.WriteLine("Allowed route: ALL nodes");
+            }
+            else
+            {
+                var tokens = routeRaw.Split(new[] { ',', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                                     .Select(t => t.Trim().ToUpper()).ToList();
+
+                // If any token looks like a destination (siding letter or a graph node), pick that as destination.
+                // This allows inputs like "M1 MAIN A1" or "A1" or "A" to be treated as "go to A1".
+                string? dest = null;
+                var nonLocTokens = tokens.Where(t => t != "M1" && t != "MAIN" && t != "M2").ToList();
+
+                // prefer siding letter in non-loco tokens
+                foreach (var tok in nonLocTokens)
+                {
+                    if (tok.Length == 1 && sidingLengths.ContainsKey(tok))
+                    {
+                        dest = $"{tok}{sidingLengths[tok] - 1}";
+                        break;
+                    }
+                }
+
+                // then prefer explicit node in non-loco tokens
+                if (dest == null)
+                {
+                    foreach (var tok in nonLocTokens)
+                    {
+                        if (graph.ContainsKey(tok))
+                        {
+                            dest = tok;
+                            break;
+                        }
+                    }
+                }
+
+                // fallback: use first siding/node token (including M1/MAIN) if nothing found above
+                if (dest == null)
+                {
+                    foreach (var tok in tokens)
+                    {
+                        if (tok.Length == 1 && sidingLengths.ContainsKey(tok))
+                        {
+                            dest = $"{tok}{sidingLengths[tok] - 1}";
+                            break;
+                        }
+                        if (graph.ContainsKey(tok))
+                        {
+                            dest = tok;
+                            break;
+                        }
+                    }
+                }
+
+                if (dest != null)
+                {
+                    var path = ShortestPathNodes("M1", dest);
+                    if (path.Count > 0)
+                    {
+                        Console.WriteLine($"Loco-only shortest path M1 -> {dest}: {string.Join(" -> ", path)}");
+                        for (int i = 1; i < path.Count; i++)
+                            Console.WriteLine($"MOVE {path[i - 1]}->{path[i]}");
+                        Console.WriteLine("Loco reached destination. Exiting (loco-only mode).");
+                        return; // do not run solver
+                    }
+                    // else fall through to parse explicit allowed nodes
+                    Console.WriteLine($"No path M1 -> {dest} found, falling back to explicit node parsing");
+                    allowedRoute = new HashSet<string>();
+                }
+                else
+                {
+                    allowedRoute = new HashSet<string>();
+                }
+
+                // if allowedRoute still empty, treat tokens as explicit node list / siding letters
+                if (allowedRoute.Count == 0)
+                {
+                    foreach (var tok in tokens)
+                    {
+                        if (tok.Length == 1 && sidingLengths.ContainsKey(tok))
+                        {
+                            var nodesForSiding = Enumerable.Range(0, sidingLengths[tok]).Select(i => $"{tok}{i}");
+                            allowedRoute.UnionWith(nodesForSiding);
+                            allowedRoute.UnionWith(new[] { "MAIN", "M1", "M2" });
+                        }
+                        else if (graph.ContainsKey(tok))
+                        {
+                            allowedRoute.Add(tok);
+                        }
+                    }
+
+                    if (allowedRoute.Count == 0)
+                    {
+                        allowedRoute = new HashSet<string>(graph.Keys);
+                        Console.WriteLine("No valid nodes entered -> falling back to ALL nodes");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Allowed route nodes: {string.Join(", ", allowedRoute)}");
+                    }
+                }
+            }
+
             // quick reachability check (ignores blocking by other cars)
             Dictionary<string, int> BFSdist(string start, Dictionary<string, List<string>> g)
             {
@@ -78,7 +226,7 @@ namespace TimesaverSolverCSharp
             }
             Console.WriteLine();
 
-            var solver = new TimesaverSolver(graph, carGoals);
+            var solver = new TimesaverSolver(graph, carGoals, allowedRoute);
             var startState = new State("M1", new List<string>(), new Dictionary<string, string>(startCars));
 
             var solution = solver.Solve(startState, maxSteps: 1_000_000_000);
@@ -104,18 +252,20 @@ namespace TimesaverSolverCSharp
                 Console.WriteLine();
             }
         }
-        
+
 
         public class TimesaverSolver
         {
             private readonly Dictionary<string, List<string>> graph;
             private readonly Dictionary<string, HashSet<string>> carGoalCandidates;
+            private readonly HashSet<string> allowedRoute;
             private readonly Dictionary<string, Dictionary<string,int>> allDists;
 
-            public TimesaverSolver(Dictionary<string, List<string>> graph, Dictionary<string, HashSet<string>> carGoalCandidates)
+            public TimesaverSolver(Dictionary<string, List<string>> graph, Dictionary<string, HashSet<string>> carGoalCandidates, HashSet<string> allowedRoute)
             {
                 this.graph = graph;
                 this.carGoalCandidates = carGoalCandidates;
+                this.allowedRoute = allowedRoute ?? new HashSet<string>(graph.Keys);
                 allDists = graph.Keys.ToDictionary(k => k, k => BFS_Distances(k));
             }
 
@@ -173,9 +323,10 @@ namespace TimesaverSolverCSharp
 
             private IEnumerable<(string action, int cost, State next)> Neighbors(State s)
             {
-                // MOVE to neighboring node (allow moving into a node that has a car so loco can couple)
+                // MOVE to neighboring node but only along allowedRoute
                 foreach (var nb in graph[s.Loco])
                 {
+                    if (!allowedRoute.Contains(nb)) continue;
                     yield return ($"MOVE {s.Loco}->{nb}", 1, new State(nb, s.Attached, new Dictionary<string, string>(s.Cars)));
                 }
 
