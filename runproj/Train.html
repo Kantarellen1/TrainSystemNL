@@ -1,28 +1,48 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"/><title>Train route tester</title>
-<style>
-  body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:18px}
-  #stops{font-family:monospace;white-space:pre-wrap;margin:6px 0}
-  #stops button{margin:2px;padding:4px 6px;font-family:inherit}
-  input{width:320px}
-  pre{background:#f4f4f4;padding:10px;border-radius:6px}
-</style>
-</head><body>
-<h2>Train route tester (loco-only shortest path via API)</h2>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Train route tester</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:18px}
+    .stops-section{margin:8px 0}
+    .stops-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .stops-row button{padding:6px 8px;border-radius:4px;border:1px solid #bbb;background:#fff;cursor:pointer}
+    #route{width:360px;padding:6px}
+    pre{background:#f4f4f4;padding:10px;border-radius:6px}
+    .muted{color:#666;font-size:90%}
+  </style>
+</head>
+<body>
+  <h2>Train route tester (loco-only shortest path)</h2>
 
-<h3>Available stops</h3>
-<p id="stops">loading...</p>
+  <div class="stops-section">
+    <h3>Available stops</h3>
+    <div>
+      <strong>End stations (7):</strong>
+      <div id="endstations" class="stops-row">loading...</div>
+    </div>
+    <div style="margin-top:10px">
+      <strong>Coupling stations (5):</strong>
+      <div id="couplings" class="stops-row">loading...</div>
+    </div>
+    <p class="muted">Click a stop to insert it into the input field.</p>
+  </div>
 
-<label for="route">Enter route token(s):</label>
-<input id="route" placeholder='Examples: "A1", "A", "M1 MAIN A1"'>
-<div style="margin-top:8px">
-  <button id="compute">Compute (API)</button>
-  <button id="local">Compute (local fallback)</button>
-</div>
-<pre id="out" style="margin-top:12px">—</pre>
+  <label for="route">Enter route token(s):</label>
+  <input id="route" placeholder='Examples: "A1", "A", "M1 MAIN A1"'>
+  <div style="margin-top:8px">
+    <button id="compute">Compute (API)</button>
+    <button id="local">Compute (local fallback)</button>
+  </div>
+
+  <pre id="out" style="margin-top:12px">—</pre>
 
 <script>
-/* derive the same topology as Program.cs */
+/* Build same topology as your C# layout and render separated lists:
+   - endstations: nodes with degree == 1 (should be 7)
+   - coupling stations: nodes adjacent to MAIN but excluding M1/M2 (the 5 siding tails)
+*/
 (function(){
   const sidingLengths = { A:2, B:3, C:1, D:2, E:1 };
 
@@ -46,40 +66,44 @@
     g['M1'] = g['M1'] || new Set(['MAIN']);
     g['M2'] = g['M2'] || new Set(['MAIN']);
     g['MAIN'].add('M1'); g['MAIN'].add('M2');
+    // convert to plain arrays for easier handling
     const res = {};
-    Object.keys(g).forEach(k => res[k]=Array.from(g[k]));
+    Object.keys(g).forEach(k => res[k] = Array.from(g[k]));
     return res;
   }
 
   const graph = buildGraph();
 
-  // show all stops (nodes) — MAIN,M1,M2 first then sorted by siding
-  const stops = Object.keys(graph).sort((a,b)=>{
-    if (a==='MAIN') return -1;
-    if (b==='MAIN') return 1;
-    if (a==='M1' || a==='M2') return -1;
-    if (b==='M1' || b==='M2') return 1;
+  // compute endstations (degree == 1)
+  const endstations = Object.keys(graph).filter(n => (graph[n]||[]).length === 1).sort((a,b)=>{
+    // put MAIN/M1/M2 at end for nicer ordering if present
+    if (a==='MAIN') return 1; if (b==='MAIN') return -1;
     return a.localeCompare(b, undefined, {numeric:true});
   });
 
-  const stopsEl = document.getElementById('stops');
-  // render stops as clickable buttons so user can pick one if unsure
-  function renderStops() {
-    stopsEl.innerHTML = '';
-    stops.forEach(s => {
+  // coupling stations = neighbors of MAIN that are NOT loco nodes (exclude M1/M2)
+  const couplings = (graph['MAIN'] || []).filter(n => n !== 'M1' && n !== 'M2').slice().sort((a,b)=> a.localeCompare(b, undefined, {numeric:true}));
+
+  const endEl = document.getElementById('endstations');
+  const coupEl = document.getElementById('couplings');
+
+  function makeButtons(list, container){
+    container.innerHTML = '';
+    list.forEach(s => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = s;
       btn.addEventListener('click', () => {
         const input = document.getElementById('route');
-        // insert or append token depending on current value
         input.value = input.value ? (input.value + ' ' + s) : s;
         input.focus();
       });
-      stopsEl.appendChild(btn);
+      container.appendChild(btn);
     });
   }
-  renderStops(); // initial render
+
+  makeButtons(endstations, endEl);
+  makeButtons(couplings, coupEl);
 
   // shortest path helper (local fallback)
   function shortestPath(from,to){
@@ -95,15 +119,16 @@
     return p.reverse();
   }
 
-  // helper: show stops in output when user has no idea
-  function showStopsInOutput() {
-    document.getElementById('out').textContent = 'Available stops:\n' + stops.join(', ');
+  function showStopsOutput(){
+    document.getElementById('out').textContent =
+      'End stations (degree==1):\n' + endstations.join(', ') + '\n\n' +
+      'Coupling stations (adjacent to MAIN):\n' + couplings.join(', ');
   }
 
-  // local button
+  // local compute
   document.getElementById('local').addEventListener('click', ()=>{
     const raw = (document.getElementById('route').value||'').trim().toUpperCase();
-    if (!raw) { showStopsInOutput(); return; } // show list when input empty
+    if (!raw){ showStopsOutput(); return; } // show lists when input empty
     const tokens = raw.split(/[,\s\t]+/).filter(Boolean);
     const nonLoc = tokens.filter(t=> t!=='M1' && t!=='MAIN' && t!=='M2');
     let dest = null;
@@ -112,28 +137,33 @@
     if (!dest) for(const t of tokens){ if (t.length===1 && sidingLengths[t]){ dest = t + (sidingLengths[t]-1); break; } if (graph[t]){ dest = t; break; } }
     if (!dest){ document.getElementById('out').textContent='No dest recognized'; return; }
     const path = shortestPath('M1', dest);
-    if (path.length === 0){ document.getElementById('out').textContent = `No path M1 -> ${dest}`; return; }
+    if (path.length===0){ document.getElementById('out').textContent=`No path M1 -> ${dest}`; return; }
     let txt = `Loco-only shortest path M1 -> ${dest}: ${path.join(' -> ')}\n\n`;
     for (let i=1;i<path.length;i++) txt += `MOVE ${path[i-1]}->${path[i]}\n`;
     txt += '\nLoco reached destination.';
     document.getElementById('out').textContent = txt;
   });
 
-  // API button
-  document.getElementById('compute').addEventListener('click', ()=>{
+  // API compute
+  document.getElementById('compute').addEventListener('click', async ()=>{
     const raw = (document.getElementById('route').value||'').trim();
-    if (!raw) { showStopsInOutput(); return; } // show list when input empty
-    fetch('http://localhost:5000/route', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ input: raw })
-    })
-    .then(r=>r.json())
-    .then(j=>{
+    if (!raw){ showStopsOutput(); return; }
+    try{
+      const r = await fetch('/route', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ input: raw })
+      });
+      const j = await r.json();
       if (j.error) { document.getElementById('out').textContent = j.error; return; }
       const txt = `Path: ${j.path.join(' -> ')}\n\n${(j.moves||[]).join('\n')}\n\nLoco reached destination.`;
       document.getElementById('out').textContent = txt;
-    })
-    .catch(e => document.getElementById('out').textContent = 'API error: ' + e);
+    }catch(e){
+      document.getElementById('out').textContent = 'API error: ' + e;
+    }
   });
+
 })();
 </script>
-</body></html>
+</body>
+</html>

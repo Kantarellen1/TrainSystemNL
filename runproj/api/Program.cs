@@ -85,6 +85,25 @@ List<string> ShortestPath(Dictionary<string, List<string>> graph, string from, s
     return path;
 }
 
+app.MapGet("/stops", () =>
+{
+    var graph = BuildGraph();
+
+    // coupling stations = nodes directly connected to MAIN
+    var coupling = graph.ContainsKey("MAIN")
+        ? graph["MAIN"].Distinct().OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList()
+        : new List<string>();
+
+    // compute degrees and pick nodes with degree == 1 as endstations
+    var endstations = graph
+        .Where(kv => kv.Value.Count == 1)
+        .Select(kv => kv.Key)
+        .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    return Results.Json(new { endstations = endstations, couplingStations = coupling });
+});
+
 app.MapPost("/route", (RouteRequest req) =>
 {
     var graph = BuildGraph();
